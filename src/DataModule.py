@@ -83,10 +83,10 @@ class DataModule:
             print("pickling error : " + str(perr))
             
     
-    def loadImages(self, path, fname):
+    def loadImages(self, fname):
 
         try :
-            with open(path + "/" + fname, 'r') as fin :
+            with open(self.path + "/" + fname, 'r') as fin :
                 imgs = pickle.load(fin)
                 return imgs
         except IOError as err :
@@ -100,6 +100,21 @@ class DataModule:
         plt.imshow(img, cmap='Greys')
         plt.show()
         
+    
+    def saveMolCounts(self, molCounts, items, expTag, fname):
+        
+        folder = self.path + "/Exp/" + expTag
+        if not os.path.exists(folder) :
+            os.makedirs(folder)
+            
+        try :
+            with open(folder + "/" + fname + ".txt", 'w') as fout :
+                fout.write('\t'.join(x for x in items) + '\n')
+                for line in molCounts :
+                    fout.write('\t'.join(str(x) for x in line) + '\n')
+        except IOError as err :
+            print("File error : " + str(err))
+                
     
 if __name__ == '__main__' :
     

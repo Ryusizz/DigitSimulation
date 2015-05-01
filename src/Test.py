@@ -3,6 +3,7 @@ from Operator import Operator
 from SSAModule import SSAModule
 from Tools import Tools
 from Tube import Tube
+from timeit import default_timer as timer
 
 
 def test_compute_propensities():
@@ -84,4 +85,6 @@ def test_thresholdClassify():
     cf = Classifier()
     print cf.thresholdClassify(D, cls, th) 
     
-test_thresholdClassify()
+start = timer()
+end = timer()
+print end - start

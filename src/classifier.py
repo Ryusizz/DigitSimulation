@@ -3,6 +3,8 @@ Created on 2015. 4. 17.
 
 @author: Ryuja
 '''
+import random
+
 from Tools import Tools
 
 
@@ -24,7 +26,8 @@ class Classifier(object):
         m = max(score)
         predict = [ j for j, k in enumerate(score) if k == m ]
         
+#         print("score is %s" % '\t'.join(map(str, score)))
         if len(predict) >= 2 :
-            return -1
+            return score, random.choice(cls)
         else :
-            return cls[predict[0]]
+            return score, cls[predict[0]]

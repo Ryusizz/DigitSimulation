@@ -25,7 +25,7 @@ class SSAModule(object):
         molCounts = np.zeros((0, len(tube.chemComp)+1))
         time = 0.0
         iteration = 0
-        outputFreq = 1000
+        outputFreq = 100
         
         spcs = tube.chemComp.keys()
         while time < maxTime :
@@ -33,9 +33,9 @@ class SSAModule(object):
             a_i = self.compute_propensities(tube.R, tube.chemComp)
             a_0 = sum(a_i)
             if a_0 <= 0.0 :
-                print "Reaction complete"
-                print("Debugging : a_0 %5.4g" % a_0)
-                print("a_i", a_i)
+                print "All reactants are exhausted"
+#                 print("Debugging : a_0 %5.4g" % a_0)
+#                 print("a_i", a_i)
                 break
             
             rand_1 = random.random()
@@ -57,13 +57,12 @@ class SSAModule(object):
                 d = [ tube.chemComp[spc] for spc in spcs ]
                 d.append(time)
                 molCounts = np.vstack((molCounts, np.array(d)))
-                print("iteration %d    time %5.4g" % (iteration, time))
-                #TODO: record time information
+#                 print("iteration %d    time %5.4g" % (iteration, time))
             
             iteration += 1
     
         spcs.append("time")
-        return molCounts, spcs
+        return molCounts, spcs, time
     
     
     def compute_propensities(self, R, chemComp):

@@ -6,12 +6,12 @@ Created on 2015. 4. 8.
 import math
 import os
 import sys
-import matplotlib.pyplot as plt
-import numpy as np
 
 from PyQt4.QtGui import QApplication, QWidget, QVBoxLayout, QDialog
 
 from Tube import Tube
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class Tools(object):
@@ -68,7 +68,10 @@ class Tools(object):
             for j in range(0, len(spcs)) :
                 [spc2, pos2] = spcs[j].split("/")
                 if pos1 == "T" and pos2 == "B" :
-                    k = Tools.calK(spc1, spc2, 60, 15)
+                    c = Tools.match(spc1, spc2)
+                    if c <= 0 :
+                        continue
+                    k = Tools.calK(spc1, spc2, 60, 15, c)
                     p = [spc1 + "___" + spc2 + "/D"]
                     R.append([ [spcs[i], spcs[j]], k, p ])
         
@@ -77,23 +80,30 @@ class Tools(object):
                         
     @staticmethod
     def appendProduct(chemComp):
-        
         spcs = chemComp.keys()
         for i in range(0, len(spcs)) :
             for j in range(0, len(spcs)) :
                 [spc1, pos1] = spcs[i].split("/")
                 [spc2, pos2] = spcs[j].split("/")
                 if pos1 == "T" and pos2 == "B" :
+                    c = Tools.match(spc1, spc2)
+                    if c <= 0 :
+                        continue
                     p = spc1 + "___" + spc2 + "/D"
                     if p not in spcs :
                         chemComp[p] = 0
+                        
+    
+    @staticmethod
+    def integerize(chemComp):
+        for spc in chemComp.keys() :
+            chemComp[spc] = int(chemComp[spc])        
         
         
     # Temporary kinetic constant calculator
     @staticmethod
-    def calK(spc1, spc2, L, t):
+    def calK(spc1, spc2, L, t, c):
         
-        c = Tools.match(spc1, spc2)
         parts1 = spc1.split("__")
         l = (L-t) * c/float(len(parts1))
         k = 5 * (10**4) * math.sqrt(l+t)
@@ -148,4 +158,5 @@ if __name__ == '__main__' :
 #     print k
 #     kp = Tools.calK("1__2__3", "1__2__3", 8, 8)
 #     print kp
+    
     pass

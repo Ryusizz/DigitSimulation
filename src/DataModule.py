@@ -16,7 +16,7 @@ import numpy as np
 class DataModule:
     
     bwThres = None
-    path = "E:/Dropbox/DigitSimulation.ver3/src/Data"
+    path = "./Data"
      
     def load_mnist(self, dataset, mode, imgSize, digits, path):
         """
@@ -75,7 +75,7 @@ class DataModule:
     def saveImages(self, imgs, path, fname):
         
         try : 
-            with open(path + "/" + fname, 'w') as fout :
+            with open(path + "/" + fname, 'wb') as fout :
                 pickle.dump(imgs, fout)
         except IOError as err :
             print("File error : " + str(err))
@@ -86,7 +86,7 @@ class DataModule:
     def loadImages(self, fname):
 
         try :
-            with open(self.path + "/" + fname, 'r') as fin :
+            with open(self.path + "/" + fname, 'rb') as fin :
                 imgs = pickle.load(fin)
                 return imgs
         except IOError as err :
@@ -114,7 +114,79 @@ class DataModule:
                     fout.write('\t'.join(str(x) for x in line) + '\n')
         except IOError as err :
             print("File error : " + str(err))
-                
+            
+    
+    def makeTrainSummaryFile(self, expTag):
+        
+        folder = self.path + "/Exp/" + expTag
+        if not os.path.exists(folder) :
+            os.makedirs(folder)
+            
+        f = open(folder + "/trainSummary.txt", 'w')
+        return f
+    
+    def makeTestSummaryFile(self, expTag):
+        
+        folder = self.path + "/Exp/" + expTag
+        if not os.path.exists(folder) :
+            os.makedirs(folder)
+            
+        f = open(folder + "/testSummary.txt", 'w')
+        return f
+    
+    def saveTrainSummaryLine(self, f, trainSummary):
+        
+        for item in trainSummary : 
+            f.write('\t' + str(item))
+        f.write('\n')
+        f.flush()
+        
+    def saveTestSummaryLine(self, f, cyc, testSummary):
+        
+        f.write(str(cyc+1))
+        m,n = testSummary.shape
+        for i in range(m) :
+            for j in range(n) :
+                f.write('\t' + str(testSummary[i][j]))
+        f.write('\n')
+        f.flush()
+    
+    def saveParams(self, pm):
+        
+        expTag = pm.get("tag")
+        folder = self.path + "/Exp/" + expTag
+        if not os.path.exists(folder) :
+            os.makedirs(folder)
+            
+        try :
+            with open(folder + "/params.txt", 'wt') as f :
+                for key in pm.prdic.keys() :
+                    f.write(key + '\t' + str(pm.get(key)) + '\n')
+        except IOError as err :
+            print("Filer error : " + str(err))
+        
+#     def saveTotalConc(self, f, tube):
+#         
+#         f.writeline(str(tube.getTotalConc()))
+#         
+#     def saveSpcNum(self, f, tube):
+#         
+#         f.writeline(str(tube.getSpcNum()))
+#         
+#     def saveReactionTime(self, f, time):
+#         
+#         f.writeline(str(time))
+#         
+#     def saveClassificationScore(self, f, score):
+#         
+#         f.writeline(str(score))
+#     
+#     def saveClassification(self, f, predict, real):
+#         
+#         f.write(str(predict))
+#         f.write(str(real))
+#         f.write("/n")
+        
     
 if __name__ == '__main__' :
     

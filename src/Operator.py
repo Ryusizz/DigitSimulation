@@ -7,11 +7,16 @@ Created on 2015. 1. 28.
 
 from collections import Counter
 import random
+from timeit import default_timer as timer
+
+from numba import cuda
 
 from DataModule import DataModule
 from SSAModule import SSAModule
 from Tools import Tools
 from Tube import Tube
+import numpy as np
+from __builtin__ import staticmethod
 
 
 class Operator(object):
@@ -45,18 +50,25 @@ class Operator(object):
     @staticmethod
     def reactionSSA(tube, time, tag):
         
+        print("\t\t\t\tCast Number of Chemical Species to Integer")
+        Tools.integerize(tube.chemComp)
+        print("\t\t\t\tAppending")
         Tools.appendProduct(tube.chemComp)
-        reverse = True
+        reverse = False
+        print("\t\t\t\tFinding Reaction")
         tube.R = Tools.findReactions(tube.chemComp, reverse)
         
+        print("\t\t\t\tStart SSA")
         if tube.R :
             ssam = SSAModule()
             dm = DataModule()
 
-            molCounts, items = ssam.lottkaVolterraSSA(tube, time)
+            molCounts, items, rTimeEnd = ssam.lottkaVolterraSSA(tube, time)
             dm.saveMolCounts(molCounts, items, tag, tube.lbl)
-            Tools.plotReactionProcess(molCounts)
+#             Tools.plotReactionProcess(molCounts)
             
+            return rTimeEnd
+        
         else :
             print "Error : Tube doesn't have reactions"
             
@@ -69,29 +81,28 @@ class Operator(object):
         
             
     
-    @staticmethod
-    def separation_old(tube, pos, yd):
-        
-        tubeOut = Tube()
-        
-        if pos == "Top" :
-            for spcs in tube.chemCompDS :
-                [top, bot] = spcs.split('/')
-                tubeOut.chemCompTop[top] += tube.chemCompDS[spcs]
-                tube.chemCompBot[bot] += tube.chemCompDS[spcs]
-                del tube.chemCompDS[spcs]
-        elif pos == "Bot" :
-            for spcs in tube.chemCompDS :
-                [top, bot] = spcs.split('/')
-                tube.chemCompTop[top] += tube.chemCompDS[spcs]
-                tubeOut.chemCompBot[bot] += tube.chemCompDS[spcs]
-                del tube.chemCompDS[spcs]
-        else :
-            print "Error : Wrong Chemical Component Position"
-            
-        #TODO: volume control
-        
-        return tubeOut
+#     @staticmethod
+#     def separation_old(tube, pos, yd):
+#         
+#         tubeOut = Tube()
+#         
+#         if pos == "Top" :
+#             for spcs in tube.chemCompDS :
+#                 [top, bot] = spcs.split('/')
+#                 tubeOut.chemCompTop[top] += tube.chemCompDS[spcs]
+#                 tube.chemCompBot[bot] += tube.chemCompDS[spcs]
+#                 del tube.chemCompDS[spcs]
+#         elif pos == "Bot" :
+#             for spcs in tube.chemCompDS :
+#                 [top, bot] = spcs.split('/')
+#                 tube.chemCompTop[top] += tube.chemCompDS[spcs]
+#                 tubeOut.chemCompBot[bot] += tube.chemCompDS[spcs]
+#                 del tube.chemCompDS[spcs]
+#         else :
+#             print "Error : Wrong Chemical Component Position"
+#             
+#         
+#         return tubeOut
         
     
     @staticmethod
@@ -104,24 +115,23 @@ class Operator(object):
             if pos == "D" :
                 sp[spc] = tube.chemComp[spc]*y
 
-        #TODO: Volume Control
-        #TODO: Subtractive separtion        
+        #TODO: Subtractive separation        
         return sp
         
         
     #TODO: Test Required 
     @staticmethod
-    def denaturation(d, pos, vol):
+    def denaturation(D, pos, vol):
         
         tubeOut = Tube()
         
-        for spc in d.keys() :
+        for spc in D.keys() :
             [oligo, _] = spc.split("/")
             [top, bot] = oligo.split("___")
             if pos == "T" :
-                tubeOut.addSubstance(top + "/T", d[spc])
+                tubeOut.addSubstance(top + "/T", D[spc])
             elif pos == "B" :
-                tubeOut.addSubstance(bot + "/B", d[spc])
+                tubeOut.addSubstance(bot + "/B", D[spc])
             else :
                 print "Error : Position error"
                 
@@ -133,21 +143,28 @@ class Operator(object):
     @staticmethod
     def amplification(tube, time):
         
-        for t in range(time) :
-            for spcs in tube.chemComp :
-                tube.chemComp[spcs] *= 2
+        for spcs in tube.chemComp :
+            tube.chemComp[spcs] *= time
     
     
-    #TODO: implement mutation
     @staticmethod
-    def mutation(tube, range):
+    def PCR(D):
         
-        pass
+        Dp = Counter()
+        
+        for spc in D.keys() :
+            [oligo, _] = spc.split("/")
+            [top, bot] = oligo.split("___")
+            pcrTop = top + "___" + top + "/D"
+            pcrBot = bot + "___" + bot + "/D"
+            Dp[pcrTop] = Dp.get(pcrTop, 0) + D[spc]
+            Dp[pcrBot] = Dp.get(pcrBot, 0) + D[spc]
+        
+        return Dp
     
     
-    #TODO: Test
     @staticmethod
-    def makeRandomLibrary(dim, conc, vol):
+    def makeRandomLibrary(dim, conc, vol, thres):
         
         E = [None] * 2 * dim**2
         
@@ -157,20 +174,47 @@ class Operator(object):
                 E[2*(i*dim+j)+1] = str(i) + "_" + str(j) + "_1"
         
         randomTube = Tube()
-        
+        random.seed()
         for e1 in E :
             for e2 in E :
                 for e3 in E :
                     if e1[:-1] != e2[:-1] and e1[:-1] != e3[:-1] and e2[:-1] != e3[:-1] :
-                        randomTube.addSubstance(e1 + "__" + e2 + "__" + e3 + "/T", random.normalvariate(conc, conc/4))
+                        if random.random() > (1-thres) :
+                            randomTube.addSubstance(e1 + "__" + e2 + "__" + e3 + "/T", random.normalvariate(conc, conc/4))
         
         randomTube.addVolume(vol)
         
         return randomTube
+    
+    
+    @staticmethod
+    def discardTube(tube):
+        
+        del tube
 
 
 if __name__ == '__main__' :
     
-    tube = Operator.makeRandomLibrary(8, 100, 50)
-    print len(tube.chemComp)
-    print tube.getTotalConc()
+#     start = timer()
+#     tube = Operator.makeRandomLibrary[100, 100](8, 100, 50, 0.01)
+#     dt = timer() - start
+#     print len(tube.chemComp)
+#     print tube.getTotalConc()
+#     print("time elapsed %f s" % dt)
+    
+#     rand = Operator.makeRandomLibrary(8, 100, 50, 0.005)
+#     print len(rand.chemComp)
+#     Tools.appendProduct(rand.chemComp)
+#     print len(rand.chemComp)
+
+#     tube = Tube()
+#     d = Counter({"1__2__3___1__2__42323/D" : 3})
+#     tube.chemComp = d
+#     Operator.discardTube(tube)
+#     print tube
+    
+    a = np.zeros((2,2))
+    a[0][1] = 1
+    print a
+    print a[0][0]
+    

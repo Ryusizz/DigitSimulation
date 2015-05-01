@@ -7,6 +7,7 @@ from collections import Counter
 
 import Tube
 
+
 class Tube(object):
     
     path = "E:/Dropbox/DigitSimulation.ver3/src/Data/Exp/"
@@ -77,6 +78,19 @@ class Tube(object):
         return out
     
     
+    def copyTube(self, vol):
+        
+        out = Tube()
+        ratio = vol/float(self.vol)
+        
+        for spcs, mol in self.chemComp.items() :
+            out.chemComp[spcs] = mol * ratio
+        out.vol += vol
+        
+        return out
+            
+    
+    
     def setLabel(self, lbl):
         
         self.lbl = lbl
@@ -92,7 +106,12 @@ class Tube(object):
     def getTotalConc(self):
         
         return sum(self.chemComp.values())
+    
+    def getSpcNum(self):
         
+        return len(self.chemComp)
+    
+
 
 if __name__ == '__main__' :
     
@@ -105,6 +124,5 @@ if __name__ == '__main__' :
 #     print t1.R
 #     print t2.R
     
-    a = Counter({"a":3, "b":2})
-    b = Counter({"a":4, "b":9})
-    print a+b
+
+    pass

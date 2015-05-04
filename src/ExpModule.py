@@ -323,14 +323,14 @@ if __name__ == '__main__':
               "tsPerCyc", 10,   # Number of test tubes per cycle
               "trTimes", [1],   # Number of training image per tube
               "tsTimes", [1],   # Number of test image per tube
-              "trexpTimes", [10],  # Number of Hyperedges per training image
-              "tsexpTimes", [10],  # Number of Hyperedges per test image
+              "trexpTimes", [20],  # Number of Hyperedges per training image
+              "tsexpTimes", [20],  # Number of Hyperedges per test image
               "cyc", [100],      # Number of cycle per one experiment
               "HEnum", 3,       # Order of Hyperedge
               "conc", 10000,    # Random Hypernetworks concentration
               "vol", 100,       # Hypernetworks volume
               "dvol", 1,        # Volume Delta while cycle 
-              "dThres", 3,      # Determination Threshold
+              "dThres", 2,      # Determination Threshold
               "rThres", 0.001,  # Random Hypernetworks Threshold
               "rTime", 1e-7,    # Reaction Time
               "sepY", 1,        # Separation yield

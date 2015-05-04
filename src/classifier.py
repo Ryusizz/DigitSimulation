@@ -12,6 +12,7 @@ class Classifier(object):
 
     def thresholdClassify(self, D, cls, th):
         
+        weight = [0,0,1,1000]
         score = [0] * len(cls)
         for i in range(len(cls)) :
             for ds in D[i].keys() :
@@ -20,8 +21,7 @@ class Classifier(object):
                 [t, b] = oligo.split("___")
                 c = Tools.match(t, b)
             
-                if c >= th :
-                    score[i] += D[i][ds]
+                score[i] += weight[c]*D[i][ds]
         
         m = max(score)
         predict = [ j for j, k in enumerate(score) if k == m ]

@@ -8,7 +8,6 @@ import os
 
 from bidict import bidict
 
-from Tools import Tools
 from Tube import Tube
 
 
@@ -21,48 +20,77 @@ class DNATube(Tube):
         self.chemCompTop = Counter()
         self.chemCompBot = Counter()
         self.chemCompDS = Counter()
+        
         self.idxTop = bidict()
         self.idxBot = bidict()
-#         self.idxDS = bidict()
+        self.idxDS = bidict()
+        
+        self.newTop = list()
+        self.newBot = list()
+        self.newDS = list()
+        
         self.vol = 0
         self.inConc = False
         
-    def addSubstance(self, spcs, mol, vol, pos):
         
-        if pos == "Top" :
+    def addSubstance(self, spcs, mol, pos):
+        
+        if pos == "T" :
             if spcs in self.chemCompTop :
-                self.chemCompTop[spcs] = self.chemCompTop[spcs] + mol
+                self.chemCompTop[spcs] += mol
             else :
                 self.chemCompTop[spcs] = mol
                 self.idxTop[spcs] = len(self.idxTop)
-        elif pos == "Bot" :
+                self.newTop.append(spcs)
+        elif pos == "B" :
             if spcs in self.chemCompBot :
-                self.chemCompBot[spcs] = self.chemCompBot.get(spcs, 0) + mol
+                self.chemCompBot[spcs] += mol
             else :
                 self.chemCompBot[spcs] = mol
                 self.idxBot[spcs] = len(self.idxBot)
+                self.newBot.append(spcs)
+        elif pos == "DS" :
+            if spcs in self.chemCompDS :
+                self.chemCompDS[spcs] += mol
+            else :
+                self.chemCompDS[spcs] = mol
+                self.idxDS[spcs] = len(self.idxDS)
+                self.newDS.append(spcs)
         else :
             print "Error : Wrong Chemical Component Position"
             
-        self.vol += vol
         
-        
-    def addVolume(self, vol):
-        
-        self.vol += vol
-    
     
     def addTube(self, tube):
         
+        # Add chemical component concentration
         self.chemCompTop += tube.chemCompTop
         self.chemCompBot += tube.chemCompBot
+        self.chemCompDS += tube.chemCompDS
         
+        # Indexing chemical component
         for spcs in tube.idxTop :
             if spcs not in self.idxTop :
                 self.idxTop[spcs] = len(self.idxTop)
         for spcs in tube.idxBot :
             if spcs not in self.idxBot :
                 self.idxBot[spcs] = len(self.idxBot)
+        for spcs in tube.idxDS :
+            if spcs not in self.idxDS :
+                self.idxDS[spcs] = len(self.idxDS)
+                
+        # Check new component
+        self.newTop.extend(tube.newTop)
+        self.newBot.extend(tube.newBot)
+        self.newDS.extend(tube.newDS)
+        for spcs in tube.chemCompTop :
+            self.newTop.append(spcs)
+        for spcs in tube.chemCompBot :
+            self.newBot.append(spcs)
+        for spcs in tube.chemCompDS :
+            self.newDS.append(spcs)
+        
+        # add volume
         self.vol += tube.vol
         
     
@@ -73,9 +101,8 @@ class DNATube(Tube):
             return
         
         out = Tube()
-        
         ratio = vol/float(self.vol)
-        
+
         for spcs, mol in self.chemCompTop.items() :
             self.chemCompTop[spcs] = mol * (1-ratio)
             out.chemCompTop[spcs] = mol * ratio
@@ -88,74 +115,96 @@ class DNATube(Tube):
             
         out.idxTop = self.idxTop.copy()
         out.idxBot = self.idxBot.copy()
+        out.idxDS = self.idxDS.copy()
+        
+        out.newTop = self.newTop[:]
+        out.newBot = self.newBot[:]
+        out.newDS = self.newDS[:]
         
         self.vol -= vol
         out.vol += vol
         
         return out
-        
-        
-    def toPSC(self, fn, expTag):
-        
-        folder = Tube.path + expTag + "/"
-        if not os.path.exists(folder) :
-            os.makedirs(folder)
-            
-        with open(folder + fn + "_reaction.psc", 'w') as f :
-            
-            f.write("# Keywords\n")
-            keywords = ""
-            keywords += "Output_In_Conc: True\n"
-            if self.inConc :
-                keywords += "Species_In_Conc: True\n"
-            else :
-                keywords += "Species_In_Conc: False\n"
-            f.write(keywords + "\n")
-            del keywords
-                
-            f.write("# Variable species\n")
-            varSpcs = ""
-            for spcs in self.chemCompTop :
-                varSpcs += "T" + spcs + " = " + str(self.chemCompTop[spcs]) + "\n"
-            for spcs in self.chemCompBot :
-                varSpcs += "B" + spcs + " = " + str(self.chemCompBot[spcs]) + "\n"
-            for spcs1 in self.chemCompTop :
-                for spcs2 in self.chemCompBot :
-                    varSpcs += "D" + spcs1 + "___" + spcs2 + " = 0\n"
-            f.write(varSpcs + "\n")
-            del varSpcs
-            
-            f.write("# Parameter\n")
-            params = ""
-            for spcsTop in self.chemCompTop :
-                for spcsBot in self.chemCompBot :
-                    paramTag = str(self.idxTop[spcsTop]) + "_" + str(self.idxBot[spcsBot])
-                    params += "K" + paramTag + " = "
-                    params += str(Tools.calK(spcsTop, spcsBot, 60, 15)) + "\n"
-            f.write(params + "\n")
-            del params
-                    
-            f.write("# Reactions\n")
-            reacts = ""
-            for spcsTop in self.chemCompTop :
-                for spcsBot in self.chemCompBot :
-                    reactTag = str(self.idxTop[spcsTop]) + "_" + str(self.idxBot[spcsBot])
-                    reacts += "R" + reactTag + ":\n"
-                    reacts += "\t" + "T" + spcsTop + " + " + "B" + spcsBot + " > " + "D" + spcsTop + "___" + spcsBot + "\n"
-                    reacts += "\t" + "K" + reactTag + "*" + "T" + spcsTop + "*" + "B" + spcsBot + "\n"
-            f.write(reacts)
-            del reacts
-        
     
-    def setLabel(self, lbl):
+    
+    def copyTube(self, vol):
         
-        self.lbl = lbl
+        out = DNATube()
+        ratio = vol/float(self.vol)
         
-    def setClass(self, cls):
+        for spcs, mol in self.chemCompTop.items() :
+            out.chemCompTop[spcs] = mol * ratio
+        for spcs, mol in self.chemCompBot.items() :
+            out.chemCompBot[spcs] = mol * ratio
+        for spcs, mol in self.chemCompDS.items() :
+            out.chemCompDS[spcs] = mol * ratio
         
-        self.cls = cls
+        out.idxTop = self.idxTop.copy()
+        out.idxBot = self.idxBot.copy()
+        out.idxDS = self.idxDS.copy()
+        
+        out.newTop = self.newTop[:]
+        out.newBot = self.newBot[:]
+        out.newDS = self.newDS[:]
+        
+        out.vol += vol
+        
+        return out
+        
+        
+#     def toPSC(self, fn, expTag):
+#         
+#         folder = Tube.path + expTag + "/"
+#         if not os.path.exists(folder) :
+#             os.makedirs(folder)
+#             
+#         with open(folder + fn + "_reaction.psc", 'w') as f :
+#             
+#             f.write("# Keywords\n")
+#             keywords = ""
+#             keywords += "Output_In_Conc: True\n"
+#             if self.inConc :
+#                 keywords += "Species_In_Conc: True\n"
+#             else :
+#                 keywords += "Species_In_Conc: False\n"
+#             f.write(keywords + "\n")
+#             del keywords
+#                 
+#             f.write("# Variable species\n")
+#             varSpcs = ""
+#             for spcs in self.chemCompTop :
+#                 varSpcs += "T" + spcs + " = " + str(self.chemCompTop[spcs]) + "\n"
+#             for spcs in self.chemCompBot :
+#                 varSpcs += "B" + spcs + " = " + str(self.chemCompBot[spcs]) + "\n"
+#             for spcs1 in self.chemCompTop :
+#                 for spcs2 in self.chemCompBot :
+#                     varSpcs += "D" + spcs1 + "___" + spcs2 + " = 0\n"
+#             f.write(varSpcs + "\n")
+#             del varSpcs
+#             
+#             f.write("# Parameter\n")
+#             params = ""
+#             for spcsTop in self.chemCompTop :
+#                 for spcsBot in self.chemCompBot :
+#                     paramTag = str(self.idxTop[spcsTop]) + "_" + str(self.idxBot[spcsBot])
+#                     params += "K" + paramTag + " = "
+#                     params += str(Tools.calK(spcsTop, spcsBot, 60, 15)) + "\n"
+#             f.write(params + "\n")
+#             del params
+#                     
+#             f.write("# Reactions\n")
+#             reacts = ""
+#             for spcsTop in self.chemCompTop :
+#                 for spcsBot in self.chemCompBot :
+#                     reactTag = str(self.idxTop[spcsTop]) + "_" + str(self.idxBot[spcsBot])
+#                     reacts += "R" + reactTag + ":\n"
+#                     reacts += "\t" + "T" + spcsTop + " + " + "B" + spcsBot + " > " + "D" + spcsTop + "___" + spcsBot + "\n"
+#                     reacts += "\t" + "K" + reactTag + "*" + "T" + spcsTop + "*" + "B" + spcsBot + "\n"
+#             f.write(reacts)
+#             del reacts
+        
         
 
 if __name__ == '__main__' :
     
-    print Tools.calK("0_0_0", "1_2_4", 60)
+    pass

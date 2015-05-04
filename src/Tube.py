@@ -10,7 +10,7 @@ import Tube
 
 class Tube(object):
     
-    path = "E:/Dropbox/DigitSimulation.ver3/src/Data/Exp/"
+#     path = "E:/Dropbox/DigitSimulation.ver3/src/Data/Exp/"
     R = None
 
     def __init__(self):
@@ -21,14 +21,10 @@ class Tube(object):
      
         
     def setGlobalReactions(self, R):
-        
         Tube.R = R
-        
     
     def setLocalReactions(self, R):
-        
         self.R = R
-        
         
     def addSubstance(self, spcs, mol):
         
@@ -40,18 +36,14 @@ class Tube(object):
 
     
     def addVolume(self, vol):
-        
         self.vol += vol
-        
     
     def addTube(self, tube):
         
         self.chemComp += tube.chemComp
-        
 #         for spcs in tube.idxTop :
 #             if spcs not in self.idxTop :
 #                 self.idxTop[spcs] = len(self.idxTop)
-
         self.vol += tube.vol
        
         
@@ -92,25 +84,15 @@ class Tube(object):
     
     
     def setLabel(self, lbl):
-        
         self.lbl = lbl
-        
     def setClass(self, cls):
-        
         self.cls = cls
-        
     def setExpTag(self, expTag):
-        
         self.expTag = expTag
-        
     def getTotalConc(self):
-        
         return sum(self.chemComp.values())
-    
     def getSpcNum(self):
-        
         return len(self.chemComp)
-    
 
 
 if __name__ == '__main__' :

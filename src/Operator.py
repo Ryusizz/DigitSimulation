@@ -53,10 +53,10 @@ class Operator(object):
         print("\t\t\t\tCast Number of Chemical Species to Integer")
         Tools.integerize(tube.chemComp)
         print("\t\t\t\tAppending")
-        Tools.appendProduct(tube.chemComp)
+        Tools.appendProduct(tube)
         reverse = False
         print("\t\t\t\tFinding Reaction")
-        tube.R = Tools.findReactions(tube.chemComp, reverse)
+        tube.R = Tools.findReactions(tube, reverse)
         
         print("\t\t\t\tStart SSA")
         if tube.R :

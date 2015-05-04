@@ -9,6 +9,7 @@ import sys
 
 from PyQt4.QtGui import QApplication, QWidget, QVBoxLayout, QDialog
 
+from DNATube import DNATube
 from Tube import Tube
 import matplotlib.pyplot as plt
 import numpy as np
@@ -52,7 +53,16 @@ class Tools(object):
                 
     
     @staticmethod
-    def findReactions(chemComp, reverse):
+    def findReactions(tube, reverse):
+        
+        if isinstance(tube, DNATube) :
+            Tools.__findReactionsOnDNATube(tube, reverse)
+        elif isinstance(tube, Tube) :
+            Tools.__findReactionsOnTube(tube, reverse)
+        
+        
+    @staticmethod
+    def __findReactionsOnTube(chemComp, reverse):
         
         R = list()
         spcs = chemComp.keys()
@@ -76,10 +86,58 @@ class Tools(object):
                     R.append([ [spcs[i], spcs[j]], k, p ])
         
         return R
+    
+    
+    @staticmethod
+    def __findReactionsOnDNATube(tube, reverse):
+        
+        R = tube.R
+        
+        for spcTop in tube.newTop :
+            for spcBot in tube.chemCompBot :
+                c = Tools.match(spcTop, spcBot)
+                if c <= 0 :
+                    continue
+                k = Tools.calK(spcTop, spcBot, 60, 15, c)
+                spcDS = [spcTop + "___" + spcBot]
+                r = [ [spcTop, spcBot], k, spcDS ]
+                if r not in R :
+                    R.append(r)
+                
+        for spcBot in tube.newBot :
+            for spcTop in tube.chemCompTop :
+                c = Tools.match(spcTop, spcBot)
+                if c <= 0 :
+                    continue
+                k = Tools.calK(spcTop, spcBot, 60, 15, c)
+                spcDS = [spcTop + "___" + spcBot]
+                r = [ [spcTop, spcBot], k, spcDS ]
+                if r not in R :
+                    R.append(r)
+        
+        if reverse :
+            for spcDS in tube.newDS :
+                k = 100
+                p = spcDS
+                r = [ [spcDS], k, p]
+                if r not in R :
+                    R.append(r)
+        
+        
+#         remove overlapped reactions
+#         R = list(set(R))
+    
+    @staticmethod
+    def appendProduct(tube):
+        
+        if isinstance(tube, DNATube) :
+            Tools.__appendProductOnDNATube(tube)
+        elif isinstance(tube, Tube) :
+            Tools.__appendProductOnTube(tube)
                         
                         
     @staticmethod
-    def appendProduct(chemComp):
+    def __appendProductOnTube(chemComp):
         spcs = chemComp.keys()
         for i in range(0, len(spcs)) :
             for j in range(0, len(spcs)) :
@@ -93,6 +151,26 @@ class Tools(object):
                     if p not in spcs :
                         chemComp[p] = 0
                         
+    
+    @staticmethod
+    def __appendProductOnDNATube(tube):
+        
+        for spcTop in tube.newTop :
+            for spcBot in tube.chemCompBot :
+                c = Tools.match(spcTop, spcBot)
+                if c <= 0 :
+                    continue
+                spcDS = spcTop + "___" + spcBot
+                tube.addSubstance(spcDS, 0, "DS")
+        
+        for spcBot in tube.newBot :
+            for spcTop in tube.chemCompTop :
+                c = Tools.match(spcTop, spcBot)
+                if c <= 0 :
+                    continue
+                spcDS = spcTop + "___" + spcBot
+                tube.addSubstance(spcDS, 0, "DS")
+    
     
     @staticmethod
     def integerize(chemComp):
@@ -159,4 +237,8 @@ if __name__ == '__main__' :
 #     kp = Tools.calK("1__2__3", "1__2__3", 8, 8)
 #     print kp
     
-    pass
+    tube = DNATube()
+    if isinstance(tube, Tube) :
+        print("Tube")
+    elif isinstance(tube, DNATube) :
+        print("Tube")

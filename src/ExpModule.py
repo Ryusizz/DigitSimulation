@@ -9,16 +9,16 @@ from string import join
 import time
 from timeit import default_timer as timer
 
+from Classifier import Classifier
+from DNATube import DNATube
 from DataModule import DataModule
 from Operator import Operator
 from ParaModule import ParaModule
 from Tube import Tube
 import numpy as np
-from Classifier import Classifier
+
 
 # from guppy import hpy
-
-
 class ExpModule :
     
     def __init__(self, pm, isChasing):
@@ -48,11 +48,16 @@ class ExpModule :
     def experiment(self, r, cyc, trt, tst, trExpt, tsExpt):
         
         print "\tPrepare Training & Test Tube..."
-        trTubes, tsTubes = self.prepare(r, cyc, trt, tst, trExpt, tsExpt)
+        trTubes = self.prepare(r, cyc, trt, tst, trExpt, tsExpt)
         print("\tRun %d cycle..." % cyc)
-        self.run(trTubes, tsTubes, cyc, tst, tsExpt)
+        self.run(trTubes, cyc, tst, tsExpt)
         
-#         print "\tTesting", r, trt, tst, trExpt, tsExpt
+        
+        
+        
+        
+        
+        
     
     
 #     def prepare(self, r, cyc, trt, tst, trExpt, tsExpt):
@@ -79,30 +84,34 @@ class ExpModule :
     def prepare(self, r, cyc, trt, tst, trExpt, tsExpt):
          
         clsNum = len(self.pm.get("cls"))
+        isDNATube = self.pm.get("isDNATube")
          
         trTubes = [None] * clsNum    
         for i in range(clsNum) :
             cls = self.trainData[i][1][0][0]
             lblPrf = "tr_c" + str(cls)
-            trTubes[i] = self.makeTubesFromData(lblPrf, "B", self.trainData[i][0], cls, cyc/2, trt, trExpt)
+            if isDNATube :
+                trTubes[i] = self.makeDNATubesFromData(lblPrf, "B", self.trainData[i][0], cls, cyc/2, trt, trExpt)
+            else :
+                trTubes[i] = self.makeTubesFromData(lblPrf, "B", self.trainData[i][0], cls, cyc/2, trt, trExpt)
         
         trTubesShuffle = list()
         for tubes in trTubes :
             trTubesShuffle.extend(tubes)
-        random.shuffle(trTubesShuffle)
+        random.shuffle(trTubesShuffle) # Training data is shuffled
         
-        tsTubes = [None] * clsNum
+#         tsTubes = [None] * clsNum
 #         for i in range(clsNum) :
 #             cls = self.testData[i][1][0][0]
 #             lblPrf = "ts_c" + str(cls)
 #             tsTubes[i] = self.makeTubesFromData(lblPrf, "B", self.testData[i][0], cls, cyc, trt, trExpt)
         
-        return trTubesShuffle, tsTubes
+        return trTubesShuffle #, tsTubes
     
             
             
             
-    def run(self, trTubes, tsTubes, cyc, tst, tsExpt):
+    def run(self, trTubes, cyc, tst, tsExpt):
 
         cls = self.pm.get("cls")
         dim = self.pm.get("dim")
@@ -114,6 +123,8 @@ class ExpModule :
         sepY = self.pm.get("sepY")
         rThres = self.pm.get("rThres")
         rTime = self.pm.get("rTime")
+        isDNATube = self.pm.get("isDNATube")
+        isRecordReact = self.pm.get("isRecordReact")
         clsNum = len(cls)
 
         dm = DataModule()
@@ -123,7 +134,10 @@ class ExpModule :
         HN = [None] * clsNum
         print("\t\tMaking Initial Random Hypernetworks...")
         for i in range(clsNum) :
-            HN[i] = Operator.makeRandomLibrary(dim, conc, vol, rThres)
+            if isDNATube :
+                HN[i] = Operator.makeRandomLibraryOnDNATube(dim, conc, vol, rThres, "T")
+            else :
+                HN[i] = Operator.makeRandomLibraryOnTube(dim, conc, vol, rThres)
             HN[i].setLabel("Hypernetworks" + str(cls[i]))
         
         
@@ -135,8 +149,12 @@ class ExpModule :
             summaryCycle = list()
             summaryCycle.append(i+1)
             for j in range(clsNum) :
-                summaryCycle.append(HN[j].getSpcNum())
-                summaryCycle.append(HN[j].getTotalConc())
+                if isDNATube :
+                    summaryCycle.append(HN[j].getSpcNum("T"))
+                    summaryCycle.append(HN[j].getConcSum("T"))
+                else :
+                    summaryCycle.append(HN[j].getSpcNum())
+                    summaryCycle.append(HN[j].getConcSum())
                 
             print("\t\t%dth Cycle" % (i+1))
             subHN = [None] * clsNum
@@ -147,17 +165,21 @@ class ExpModule :
                 tr = trTubes[i]
                 
                 subHN[j] = HN[j].divideTube(dvol)
-                subHN[j].setLabel("learningcycle" + str(i+1))
+                subHN[j].setLabel("HN" + str(cls[j]) + "_learningcycle" + str(i+1))
                 print "\t\t\tPour training tube..."
                 subHN[j].addTube(tr)
                 print "\t\t\tReacting..."
-                rTimeEnd = Operator.reactionSSA(subHN[j], rTime, tag)
+                rTimeEnd = Operator.reactionSSA(subHN[j], rTime, tag, isRecordReact)
                 summaryCycle.append(rTimeEnd)
                 print "\t\t\tElectrophoresis..."
                 DList[j] = Operator.separation(subHN[j], sepY)
                 
             csf = Classifier()
-            score, predict = csf.thresholdClassify(DList, cls, dThres)
+            if isDNATube :
+                score, predict = csf.thresholdClassifyOnDNATube(DList, cls, dThres)
+            else :
+                score, predict = csf.thresholdClassifyOnTube(DList, cls, dThres)
+                
             for j in range(clsNum) :
                 summaryCycle.append(score[j])
             summaryCycle.append(predict)
@@ -166,8 +188,13 @@ class ExpModule :
             print("\t\t\tFeedback...")
             update = [None] * clsNum
             for j in range(clsNum) :
-                DList[j] = Operator.PCR(DList[j])
-                update[j] = Operator.denaturation(DList[j], "T", dvol)
+                if isDNATube :
+                    DList[j] = Operator.PCR_DNA(DList[j])
+                    update[j] = Operator.denaturationOnDNATube(DList[j], "T", dvol)
+                else :
+                    DList[j] = Operator.PCR(DList[j])
+                    update[j] = Operator.denaturationOnTube(DList[j], "T", dvol)
+                
              
             if predict == tr.cls :
                 for j in range(clsNum) :
@@ -213,6 +240,8 @@ class ExpModule :
         rTime = self.pm.get("rTime")
         sepY = self.pm.get("sepY")
         dThres = self.pm.get("dThres")
+        isRecordReact = self.pm.get("isRecordReact")
+        isDNATube = self.pm.get("isDNATube")
         clsNum = len(cls)
         
         # Prepare test Tubes
@@ -221,7 +250,10 @@ class ExpModule :
         for i in range(clsNum) :
             c = self.testData[i][1][0][0]
             lblPrf = "ts_cyc" + str(cyc)
-            tsTubes.extend(self.makeTubesFromData(lblPrf, "B", self.testData[i][0], c, tsPerCyc/2, tst, tsExpt))
+            if isDNATube :
+                tsTubes.extend(self.makeDNATubesFromData(lblPrf, "B", self.testData[i][0], c, tsPerCyc/2, tst, tsExpt))
+            else :
+                tsTubes.extend(self.makeTubesFromData(lblPrf, "B", self.testData[i][0], c, tsPerCyc/2, tst, tsExpt))
         random.shuffle(tsTubes)
         
         # Run Test
@@ -235,16 +267,20 @@ class ExpModule :
             for j in range(clsNum) :
                 ts = tsTubes[i]
                 subHN[j] = HN[j].copyTube(dvol)
-                subHN[j].setLabel("Cycle" + str(cyc+1) + "_test" + str(i+1))
+                subHN[j].setLabel("HN" + str(cls[j]) + "_Cycle" + str(cyc+1) + "_test" + str(i+1))
 #                 print "\t\t\t\tPour test tube..."
                 subHN[j].addTube(ts)
 #                 print "\t\t\t\tReacting..."
-                Operator.reactionSSA(subHN[j], rTime, tag)
+                Operator.reactionSSA(subHN[j], rTime, tag, isRecordReact)
 #                 print "\t\t\t\tElectrophoresis..."
                 DList[j] = Operator.separation(subHN[j], sepY)
                 
             csf = Classifier()
-            score, predict = csf.thresholdClassify(DList, cls, dThres)
+            if isDNATube :
+                score, predict = csf.thresholdClassifyOnDNATube(DList, cls, dThres)
+            else :
+                score, predict = csf.thresholdClassifyOnTube(DList, cls, dThres)
+
             testSummary[cls.index(predict)][cls.index(ts.cls)] += 1
             tsTubes[i] = None
             
@@ -282,7 +318,33 @@ class ExpModule :
 #                 
 #         return tubes
     
+
+    def makeDNATubesFromData(self, lblPrf, pos, data, cls, cyc, t, expt):
+        
+        dim = self.pm.get("dim")
+        HEnum = self.pm.get("HEnum")
+        conc = self.pm.get("conc")
+        
+        random.seed()
+        random.shuffle(data)
+        
+        tubes = [None] * cyc
+        
+        for i in range(cyc) :
+            tubes[i] = DNATube()
+            for j in range(t) :
+                d = data[i*t + j]
+                for k in range(expt) :
+                    idx = [ (p/dim, p%dim) for p in np.random.choice(dim**2, HEnum, replace=False) ]
+                    HE = join([ str(idx[m][0]) + '_' + str(idx[m][1]) + '_' + str(d[idx[m]]) for m in range(HEnum) ], '__')
+                    tubes[i].addSubstance(HE, conc, pos)
+                    tubes[i].setClass(cls)
+            
+            tubes[i].setLabel(lblPrf + "_cycle" + str(cyc+1))
+            
+        return tubes
     
+            
     def makeTubesFromData(self, lblPrf, pos, data, cls, cyc, t, expt):
         
         dim = self.pm.get("dim")
@@ -313,10 +375,11 @@ class ExpModule :
     
 if __name__ == '__main__':
     
-    expTag = raw_input("\n\n\n---Input the tag of this experiment\n")
-    if not expTag :
-        expTag = str(time.time())
+#     expTag = raw_input("\n\n\n---Input the tag of this experiment\n")
+#     if not expTag :
+#         expTag = str(time.time())
         
+    expTag = str(time.time())
     params = ["cls", [6,7],     # Class
               "dim", 8,         # Dimension of Digit
               "rp", [1],        # Repeat number of whole experiment
@@ -325,15 +388,17 @@ if __name__ == '__main__':
               "tsTimes", [1],   # Number of test image per tube
               "trexpTimes", [20],  # Number of Hyperedges per training image
               "tsexpTimes", [20],  # Number of Hyperedges per test image
-              "cyc", [100],      # Number of cycle per one experiment
+              "cyc", [4],      # Number of cycle per one experiment
               "HEnum", 3,       # Order of Hyperedge
               "conc", 10000,    # Random Hypernetworks concentration
               "vol", 100,       # Hypernetworks volume
               "dvol", 1,        # Volume Delta while cycle 
               "dThres", 2,      # Determination Threshold
               "rThres", 0.001,  # Random Hypernetworks Threshold
-              "rTime", 1e-7,    # Reaction Time
+              "rTime", 1,    # Reaction Time
               "sepY", 1,        # Separation yield
+              "isRecordReact", True,   # Whether record reactions or not
+              "isDNATube", True,        # Whether use DNATube of Tube
               "tag", expTag     # Experiment tag
               ]
     

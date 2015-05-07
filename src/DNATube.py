@@ -20,6 +20,7 @@ class DNATube(Tube):
         self.chemCompTop = Counter()
         self.chemCompBot = Counter()
         self.chemCompDS = Counter()
+        self.chemCompList = [self.chemCompTop, self.chemCompBot, self.chemCompDS]
         
         self.idxTop = bidict()
         self.idxBot = bidict()
@@ -28,6 +29,8 @@ class DNATube(Tube):
         self.newTop = list()
         self.newBot = list()
         self.newDS = list()
+        
+        self.R = list()
         
         self.vol = 0
         self.inConc = False
@@ -100,7 +103,7 @@ class DNATube(Tube):
             print "Error : Dividing volume is larger than original volume"
             return
         
-        out = Tube()
+        out = DNATube()
         ratio = vol/float(self.vol)
 
         for spcs, mol in self.chemCompTop.items() :
@@ -150,8 +153,27 @@ class DNATube(Tube):
         out.vol += vol
         
         return out
+    
+    
+    def getConcSum(self, pos):
+        if pos == "T" :
+            return sum(self.chemCompTop.values())
+        elif pos == "B" :
+            return sum(self.chemCompBot.values())
+        elif pos == "DS" :
+            return sum(self.chemCompDS.values())
         
-        
+    def getSpcNum(self, pos):
+        if pos == "T" :
+            return len(self.chemCompTop)
+        elif pos == "B" :
+            return len(self.chemCompBot)
+        elif pos == "DS" :
+            return len(self.chemCompDS)
+        elif pos == "All" :
+            return len(self.chemCompTop) + len(self.chemCompBot) + len(self.chemCompDS)
+    
+                
 #     def toPSC(self, fn, expTag):
 #         
 #         folder = Tube.path + expTag + "/"

@@ -16,6 +16,7 @@ class Tube(object):
     def __init__(self):
         
         self.chemComp = Counter()
+        self.chemCompList = [self.chemComp]
         self.vol = 0
         self.inConc = False
      
@@ -89,7 +90,7 @@ class Tube(object):
         self.cls = cls
     def setExpTag(self, expTag):
         self.expTag = expTag
-    def getTotalConc(self):
+    def getConcSum(self):
         return sum(self.chemComp.values())
     def getSpcNum(self):
         return len(self.chemComp)

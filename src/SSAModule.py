@@ -31,18 +31,22 @@ class SSAModule(object):
     def __SSAOnDNATube(self, tube, maxTime):
         
         random.seed()
-        molCounts = np.zeros((0, len(tube.chemCompTop) + 
-                              len(tube.chemCompBot) + 
-                              len(tube.chemComDS) + 1 ))
+        molCountsTop = np.zeros((0, len(tube.chemCompTop)))
+        molCountsBot = np.zeros((0, len(tube.chemCompBot)))
+        molCountsDS = np.zeros((0, len(tube.chemCompDS)))
+        timeCounts = np.zeros((0,1))
+        spcsTop = tube.chemCompTop.keys()
+        spcsBot = tube.chemCompBot.keys()
+        spcsDS = tube.chemCompDS.keys()
         time = 0.0
         iteration = 0
         
         while time < maxTime :
             
-            a_i = self.computePropensitiesDNA(tube.R, tube.chemCompTop, tube.chemCompBot, tube.chemComDS)
+            a_i = self.computePropensitiesDNA(tube.R, tube.chemCompTop, tube.chemCompBot, tube.chemCompDS)
             a_0 = sum(a_i)
             if a_0 <= 0.0 :
-                print "All reactants are exhausted"
+#                 print "All reactants are exhausted"
 #                 print("Debugging : a_0 %5.4g" % a_0)
 #                 print("a_i", a_i)
                 break
@@ -63,16 +67,26 @@ class SSAModule(object):
             self.updateDNA(tube.R, count-1, tube.chemCompTop, tube.chemCompBot, tube.chemCompDS)
             
             if (iteration % self.outputFreq) == 0 :
-                d = [ tube.chemComp[spc] for spc in spcs ]
-                d.append(time)
-                molCounts = np.vstack((molCounts, np.array(d)))
+                
+                molCountsTop = self.__writeCount(tube.chemCompTop, molCountsTop, spcsTop)
+                molCountsBot = self.__writeCount(tube.chemCompBot, molCountsBot, spcsBot)
+                molCountsDS = self.__writeCount(tube.chemCompDS, molCountsDS, spcsDS)
+                timeCounts = np.vstack((timeCounts, np.array([time])))
 #                 print("iteration %d    time %5.4g" % (iteration, time))
             
             iteration += 1
     
-        spcs.append("time")
-        return molCounts, spcs, time
+        molCountsList = [molCountsTop, molCountsBot, molCountsDS]
+        spcsList = [spcsTop, spcsBot, spcsDS]
+        headList = ["Top", "Bot", "Double"]
+        return molCountsList, spcsList, headList, timeCounts, time
     
+    
+    def __writeCount(self, chemComp, molCounts, spcs):
+        
+        d = [ chemComp[spc] for spc in spcs ]
+        return np.vstack((molCounts, np.array(d)))
+        
     
     def __SSAOnTube(self, tube, maxTime):
         
@@ -87,7 +101,7 @@ class SSAModule(object):
             a_i = self.compute_propensities(tube.R, tube.chemComp)
             a_0 = sum(a_i)
             if a_0 <= 0.0 :
-                print "All reactants are exhausted"
+#                 print "All reactants are exhausted"
 #                 print("Debugging : a_0 %5.4g" % a_0)
 #                 print("a_i", a_i)
                 break
@@ -128,16 +142,16 @@ class SSAModule(object):
             subs = r[0]
             rate = r[1]
             
-            p = rate
+#             p = rate
             if len(subs) == 2 :
-                subTop = subs[0]
-                subBot = subs[1]
-                p *= chemCompTop[subTop] * chemCompBot[subBot]
+#                 subTop = subs[0]
+#                 subBot = subs[1]
+                P[i] = rate * chemCompTop[subs[0]] * chemCompBot[subs[1]]
             elif len(subs) == 1 :
-                subDS = subs[0]
-                p *= chemCompDS[subDS]
+#                 subDS = subs[0]
+                P[i] = rate * chemCompDS[subs[0]]
             
-            P[i] = p
+#             P[i] = p
         
         return P
     

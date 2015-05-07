@@ -101,14 +101,14 @@ class DataModule:
         plt.show()
         
     
-    def saveMolCounts(self, molCounts, items, expTag, fname):
+    def saveMolCounts(self, molCounts, items, head, expTag, fname):
         
-        folder = self.path + "/Exp/" + expTag
+        folder = self.path + "/Exp/" + expTag + "/" + fname
         if not os.path.exists(folder) :
             os.makedirs(folder)
             
         try :
-            with open(folder + "/" + fname + ".txt", 'w') as fout :
+            with open(folder + "/" + head + ".txt", 'w') as fout :
                 fout.write('\t'.join(x for x in items) + '\n')
                 for line in molCounts :
                     fout.write('\t'.join(str(x) for x in line) + '\n')

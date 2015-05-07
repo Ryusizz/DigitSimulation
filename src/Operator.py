@@ -5,18 +5,19 @@ Created on 2015. 1. 28.
 '''
 # import stochpy
 
+from __builtin__ import staticmethod
 from collections import Counter
 import random
 from timeit import default_timer as timer
 
 from numba import cuda
 
+from DNATube import DNATube
 from DataModule import DataModule
 from SSAModule import SSAModule
 from Tools import Tools
 from Tube import Tube
 import numpy as np
-from __builtin__ import staticmethod
 
 
 class Operator(object):
@@ -48,23 +49,35 @@ class Operator(object):
     
     
     @staticmethod
-    def reactionSSA(tube, time, tag):
+    def reactionSSA(tube, time, tag, isRecordReact):
         
-        print("\t\t\t\tCast Number of Chemical Species to Integer")
-        Tools.integerize(tube.chemComp)
-        print("\t\t\t\tAppending")
+#         print("\t\t\t\tCast Number of Chemical Species to Integer")
+        Tools.integerize(tube)
+#         print("\t\t\t\tAppending")
         Tools.appendProduct(tube)
         reverse = False
-        print("\t\t\t\tFinding Reaction")
+#         print("\t\t\t\tFinding Reaction")
         tube.R = Tools.findReactions(tube, reverse)
         
-        print("\t\t\t\tStart SSA")
+#         print("\t\t\t\tStart SSA")
         if tube.R :
             ssam = SSAModule()
             dm = DataModule()
 
-            molCounts, items, rTimeEnd = ssam.lottkaVolterraSSA(tube, time)
-            dm.saveMolCounts(molCounts, items, tag, tube.lbl)
+            if isinstance(tube, DNATube) :
+                molCountsList, spcsList, headList, timeCounts, rTimeEnd = ssam.SSA(tube, time)
+                if isRecordReact :
+                    for i in range(len(molCountsList)) :
+                        molCounts = molCountsList[i]
+                        spcs = spcsList[i]
+                        head = headList[i]
+                        dm.saveMolCounts(molCounts, spcs, head, tag, tube.lbl)
+                    dm.saveMolCounts(timeCounts, ["time"], "time", tag, tube.lbl)
+                
+            elif isinstance(tube, Tube) :    
+                molCounts, items, rTimeEnd = ssam.SSA(tube, time)
+                if isRecordReact :
+                    dm.saveMolCounts(molCounts, items, "All", tag, tube.lbl)
 #             Tools.plotReactionProcess(molCounts)
             
             return rTimeEnd
@@ -109,11 +122,16 @@ class Operator(object):
     def separation(tube, y):
         
         sp = Counter()
-                
-        for spc in tube.chemComp.keys() :
-            [oligo, pos] = spc.split("/")
-            if pos == "D" :
-                sp[spc] = tube.chemComp[spc]*y
+        
+        if isinstance(tube, DNATube) :
+            for spc, mol in tube.chemCompDS.items() :
+                sp[spc] = mol * y
+        
+        elif isinstance(tube, Tube) :
+            for spc in tube.chemComp.keys() :
+                [oligo, pos] = spc.split("/")
+                if pos == "D" :
+                    sp[spc] = tube.chemComp[spc]*y
 
         #TODO: Subtractive separation        
         return sp
@@ -121,7 +139,26 @@ class Operator(object):
         
     #TODO: Test Required 
     @staticmethod
-    def denaturation(D, pos, vol):
+    def denaturationOnDNATube(D, pos, vol):
+        
+        tubeOut = DNATube()
+        
+        for spc in D.keys() :
+            [top, bot] = spc.split("___")
+            if pos == "T" :
+                tubeOut.addSubstance(top, D[spc], pos)
+            elif pos == "B" :
+                tubeOut.addSubstance(bot, D[spc], pos)
+            else :
+                print "Error : Position error"
+                
+        tubeOut.addVolume(vol)
+        
+        return tubeOut
+    
+    
+    @staticmethod
+    def denaturationOnTube(D, pos, vol):
         
         tubeOut = Tube()
         
@@ -143,8 +180,24 @@ class Operator(object):
     @staticmethod
     def amplification(tube, time):
         
-        for spcs in tube.chemComp :
-            tube.chemComp[spcs] *= time
+        for chemComp in tube.chemCompList :
+            for spcs in chemComp :
+                chemComp[spcs] *= time
+    
+    
+    @staticmethod
+    def PCR_DNA(D):
+        
+        Dp = Counter()
+        
+        for spc in D.keys() :
+            [top, bot] = spc.split("___")
+            pcrTop = top + "___" + top + "/D"
+            pcrBot = bot + "___" + bot + "/D"
+            Dp[pcrTop] = Dp.get(pcrTop, 0) + D[spc]
+            Dp[pcrBot] = Dp.get(pcrBot, 0) + D[spc]
+        
+        return Dp
     
     
     @staticmethod
@@ -164,7 +217,30 @@ class Operator(object):
     
     
     @staticmethod
-    def makeRandomLibrary(dim, conc, vol, thres):
+    def makeRandomLibraryOnDNATube(dim, conc, vol, thres, pos):
+        
+        E = [None] * 2 * dim**2
+        
+        for i in range(dim) :
+            for j in range(dim) :
+                E[2*(i*dim+j)+0] = str(i) + "_" + str(j) + "_0"
+                E[2*(i*dim+j)+1] = str(i) + "_" + str(j) + "_1"
+        
+        randomTube = DNATube()
+        random.seed()
+        for e1 in E :
+            for e2 in E :
+                for e3 in E :
+                    if e1[:-1] != e2[:-1] and e1[:-1] != e3[:-1] and e2[:-1] != e3[:-1] :
+                        if random.random() > (1-thres) :
+                            randomTube.addSubstance(e1 + "__" + e2 + "__" + e3, random.normalvariate(conc, conc/4), pos)
+        
+        randomTube.addVolume(vol)
+        
+        return randomTube
+    
+    @staticmethod
+    def makeRandomLibraryOnTube(dim, conc, vol, thres):
         
         E = [None] * 2 * dim**2
         

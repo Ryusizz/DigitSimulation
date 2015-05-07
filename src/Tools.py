@@ -13,6 +13,7 @@ from DNATube import DNATube
 from Tube import Tube
 import matplotlib.pyplot as plt
 import numpy as np
+from DataModule import DataModule
 
 
 class Tools(object):
@@ -26,7 +27,7 @@ class Tools(object):
     @staticmethod
     def recordTubes(tubes, fn, expTag):
         
-        folder = Tube.path + expTag + "/"
+        folder = DataModule.path + expTag + "/"
         if not os.path.exists(folder) :
             os.makedirs(folder)
             
@@ -56,16 +57,18 @@ class Tools(object):
     def findReactions(tube, reverse):
         
         if isinstance(tube, DNATube) :
-            Tools.__findReactionsOnDNATube(tube, reverse)
+            R = Tools.__findReactionsOnDNATube(tube, reverse)
         elif isinstance(tube, Tube) :
-            Tools.__findReactionsOnTube(tube, reverse)
+            R = Tools.__findReactionsOnTube(tube, reverse)
+            
+        return R
         
         
     @staticmethod
-    def __findReactionsOnTube(chemComp, reverse):
+    def __findReactionsOnTube(tube, reverse):
         
         R = list()
-        spcs = chemComp.keys()
+        spcs = tube.chemComp.keys()
         for i in range(0, len(spcs)) :
             [spc1, pos1] = spcs[i].split("/")
             
@@ -123,9 +126,8 @@ class Tools(object):
                 if r not in R :
                     R.append(r)
         
-        
-#         remove overlapped reactions
-#         R = list(set(R))
+        return R
+    
     
     @staticmethod
     def appendProduct(tube):
@@ -137,8 +139,8 @@ class Tools(object):
                         
                         
     @staticmethod
-    def __appendProductOnTube(chemComp):
-        spcs = chemComp.keys()
+    def __appendProductOnTube(tube):
+        spcs = tube.chemComp.keys()
         for i in range(0, len(spcs)) :
             for j in range(0, len(spcs)) :
                 [spc1, pos1] = spcs[i].split("/")
@@ -149,7 +151,7 @@ class Tools(object):
                         continue
                     p = spc1 + "___" + spc2 + "/D"
                     if p not in spcs :
-                        chemComp[p] = 0
+                        tube.chemComp[p] = 0
                         
     
     @staticmethod
@@ -173,9 +175,10 @@ class Tools(object):
     
     
     @staticmethod
-    def integerize(chemComp):
-        for spc in chemComp.keys() :
-            chemComp[spc] = int(chemComp[spc])        
+    def integerize(tube):
+        for chemComp in tube.chemCompList :
+            for spc in chemComp.keys() :
+                chemComp[spc] = int(chemComp[spc])        
         
         
     # Temporary kinetic constant calculator

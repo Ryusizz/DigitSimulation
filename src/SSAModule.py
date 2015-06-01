@@ -7,6 +7,8 @@ from collections import Counter
 import math
 import random
 
+from numba import cuda
+
 from DNATube import DNATube
 from DataModule import DataModule
 import numpy as np
@@ -43,7 +45,12 @@ class SSAModule(object):
         
         while time < maxTime :
             
-            a_i = self.computePropensitiesDNA(tube.R, tube.chemCompTop, tube.chemCompBot, tube.chemCompDS)
+            """Temporary GPGPU Part"""
+            threads_per_block = 128
+            number_of_blocks = (len(tube.R)/threads_per_block) + 1
+            P = np.empty(len(tube.R))
+            a_i = computePropentsitiesDNA_GPU [ number_of_blocks, threads_per_block ] (tube.R, len(tube.R), P, tube.chemCompTop, tube.chemCompBot, tube.chemCompDS)
+#             a_i = self.computePropensitiesDNA(tube.R, tube.chemCompTop, tube.chemCompBot, tube.chemCompDS)
             a_0 = sum(a_i)
             if a_0 <= 0.0 :
 #                 print "All reactants are exhausted"
@@ -155,7 +162,8 @@ class SSAModule(object):
         
         return P
     
-    def compute_propensities(self, R, chemComp):
+    
+    def computePropensities(self, R, chemComp):
         
         P = [None] * len(R)
                 
@@ -208,6 +216,22 @@ class SSAModule(object):
             chemComp[prod] += 1        
 
 
+@cuda.autojit
+def computePropentsitiesDNA_GPU(R, Rsize, P, chemCompTop, chemCompBot, chemCompDS):
+    
+    tid = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x    # gpu index part
+    
+    if tid < Rsize :
+        r = R[tid]
+        subs = r[0]
+        rate = r[1]
+    
+        if len(subs) == 2 :
+            P[tid] = rate * chemCompTop[subs[0]] * chemCompBot[subs[1]]
+        elif len(subs) == 1 :
+            P[tid] = rate * chemCompDS[subs[0]]
+                
+                
 if __name__ == '__main__' :
     
     a = [1,2,3]

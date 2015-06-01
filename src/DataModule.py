@@ -164,6 +164,26 @@ class DataModule:
                     f.write(key + '\t' + str(pm.get(key)) + '\n')
         except IOError as err :
             print("Filer error : " + str(err))
+       
+            
+    def saveTubeDistribution(self, tube, expTag, fname=None):
+        
+        if not fname :
+            fname = tube.lbl
+            
+        folder = self.path + "/Exp/" + expTag + "/" + fname
+        if not os.path.exists(folder) :
+            os.makedirs(folder)
+            
+        try :
+            with open(folder + "/" + fname + ".txt", 'w') as fout :
+                fout.write('\t'.join(x for x in items) + '\n')
+                for line in molCounts :
+                    fout.write('\t'.join(str(x) for x in line) + '\n')
+        except IOError as err :
+            print("File error : " + str(err))
+        
+        
         
 #     def saveTotalConc(self, f, tube):
 #         

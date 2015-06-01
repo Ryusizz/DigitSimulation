@@ -172,6 +172,12 @@ class DNATube(Tube):
             return len(self.chemCompDS)
         elif pos == "All" :
             return len(self.chemCompTop) + len(self.chemCompBot) + len(self.chemCompDS)
+        
+    def getChemCompListAll(self):
+        
+        pass
+    
+    
     
                 
 #     def toPSC(self, fn, expTag):

@@ -9,14 +9,15 @@ import sys
 
 from PyQt4.QtGui import QApplication, QWidget, QVBoxLayout, QDialog
 
-from DNATube import DNATube
+from DNATube_GPU import DNATube_GPU
+from DataModule import DataModule
+from Tools import Tools
 from Tube import Tube
 import matplotlib.pyplot as plt
 import numpy as np
-from DataModule import DataModule
 
 
-class Tools(object):
+class Tools_GPU(Tools):
 
     h = 6.626e-34 #J*s
     kB = 1.380e-23 #J*K-1
@@ -24,6 +25,8 @@ class Tools(object):
     dG = -115e3 #cal/mole
     R = 1.987 #calK-1mol-1
 
+
+    #FIXME: move this method to DataModule
     @staticmethod
     def recordTubes(tubes, fn, expTag):
         
@@ -56,10 +59,10 @@ class Tools(object):
     @staticmethod
     def findReactions(tube, reverse):
         
-        if isinstance(tube, DNATube) :
-            R = Tools.__findReactionsOnDNATube(tube, reverse)
+        if isinstance(tube, DNATube_GPU) :
+            R = Tools_GPU.__findReactionsOnDNATube(tube, reverse)
         elif isinstance(tube, Tube) :
-            R = Tools.__findReactionsOnTube(tube, reverse)
+            R = Tools_GPU.__findReactionsOnTube(tube, reverse)
             
         return R
     
@@ -67,8 +70,8 @@ class Tools(object):
     @staticmethod
     def findReactionMatrix(tube, reverse):
         
-        if isinstance(tube, DNATube) :
-            return Tools.__findReactionMatrixOnDNATube(tube, reverse)
+        if isinstance(tube, DNATube_GPU) :
+            return Tools_GPU.__findReactionMatrixOnDNATube(tube, reverse)
                 
     
     @staticmethod
@@ -96,10 +99,10 @@ class Tools(object):
             for j in range(0, len(spcs)) :
                 [spc2, pos2] = spcs[j].split("/")
                 if pos1 == "T" and pos2 == "B" :
-                    c = Tools.match(spc1, spc2)
+                    c = Tools_GPU.match(spc1, spc2)
                     if c <= 0 :
                         continue
-                    k = Tools.calK(spc1, spc2, 60, 15, c)
+                    k = Tools_GPU.calK(spc1, spc2, 60, 15, c)
                     p = [spc1 + "___" + spc2 + "/D"]
                     R.append([ [spcs[i], spcs[j]], k, p ])
         
@@ -110,29 +113,41 @@ class Tools(object):
     def __findReactionsOnDNATube(tube, reverse):
         
         R = tube.R
+        # R = [ reactantNum1, reactantNum2, reaction rate constant(k), productNum ]
+        # If reaction is first order, reactantNum2 = 0
+        # that redirect to concentration 1 
         
         for spcTop in tube.newTop :
-            for spcBot in tube.chemCompBot :
-                c = Tools.match(spcTop, spcBot)
+            for spcBot in tube.idxBot :
+                c = Tools_GPU.match(spcTop, spcBot)
                 if c <= 0 :
                     continue
-                k = Tools.calK(spcTop, spcBot, 60, 15, c)
-                spcDS = [spcTop + "___" + spcBot]
-                r = [ [spcTop, spcBot], k, spcDS ]
-                if r not in R :
-                    R.append(r)
+                k = Tools_GPU.calK(spcTop, spcBot, 60, 15, c)
+                spcDS = spcTop + "___" + spcBot
+                if spcDS not in tube.RList :
+                    tube.RList.append(spcDS)
+                    r = [ tube.idxTop[spcTop], tube.idxBot[spcBot], k, tube.idxDS[spcDS] ]
+                    R = np.vstack((R,r))
+                else :
+                    print("A")
+        tube.newTop[:] = [] #empty new component list
                 
         for spcBot in tube.newBot :
-            for spcTop in tube.chemCompTop :
-                c = Tools.match(spcTop, spcBot)
+            for spcTop in tube.idxTop :
+                c = Tools_GPU.match(spcTop, spcBot)
                 if c <= 0 :
                     continue
-                k = Tools.calK(spcTop, spcBot, 60, 15, c)
-                spcDS = [spcTop + "___" + spcBot]
-                r = [ [spcTop, spcBot], k, spcDS ]
-                if r not in R :
-                    R.append(r)
+                k = Tools_GPU.calK(spcTop, spcBot, 60, 15, c)
+                spcDS = spcTop + "___" + spcBot
+                if spcDS not in tube.RList :
+                    tube.RList.append(spcDS)
+                    r = [ tube.idxTop[spcTop], tube.idxBot[spcBot], k, tube.idxDS[spcDS] ]
+                    R = np.vstack((R,r))
+                else :
+                    print("B")
+        tube.newBot[:] = []
         
+        #FIXME: fit to new data structure
         if reverse :
             for spcDS in tube.newDS :
                 k = 100
@@ -140,6 +155,7 @@ class Tools(object):
                 r = [ [spcDS], k, p]
                 if r not in R :
                     R.append(r)
+            tube.newDS[:] = []
         
         return R
     
@@ -147,10 +163,10 @@ class Tools(object):
     @staticmethod
     def appendProduct(tube):
         
-        if isinstance(tube, DNATube) :
-            Tools.__appendProductOnDNATube(tube)
+        if isinstance(tube, DNATube_GPU) :
+            Tools_GPU.__appendProductOnDNATube(tube)
         elif isinstance(tube, Tube) :
-            Tools.__appendProductOnTube(tube)
+            Tools_GPU.__appendProductOnTube(tube)
                         
                         
     @staticmethod
@@ -161,7 +177,7 @@ class Tools(object):
                 [spc1, pos1] = spcs[i].split("/")
                 [spc2, pos2] = spcs[j].split("/")
                 if pos1 == "T" and pos2 == "B" :
-                    c = Tools.match(spc1, spc2)
+                    c = Tools_GPU.match(spc1, spc2)
                     if c <= 0 :
                         continue
                     p = spc1 + "___" + spc2 + "/D"
@@ -173,16 +189,16 @@ class Tools(object):
     def __appendProductOnDNATube(tube):
         
         for spcTop in tube.newTop :
-            for spcBot in tube.chemCompBot :
-                c = Tools.match(spcTop, spcBot)
+            for spcBot in tube.idxBot :
+                c = Tools_GPU.match(spcTop, spcBot)
                 if c <= 0 :
                     continue
                 spcDS = spcTop + "___" + spcBot
                 tube.addSubstance(spcDS, 0, "DS")
         
         for spcBot in tube.newBot :
-            for spcTop in tube.chemCompTop :
-                c = Tools.match(spcTop, spcBot)
+            for spcTop in tube.idxTop :
+                c = Tools_GPU.match(spcTop, spcBot)
                 if c <= 0 :
                     continue
                 spcDS = spcTop + "___" + spcBot
@@ -192,52 +208,28 @@ class Tools(object):
     @staticmethod
     def integerize(tube):
         for chemComp in tube.chemCompList :
-            for spc in chemComp.keys() :
-                chemComp[spc] = int(chemComp[spc])        
+            chemComp[:] = [ int(i) for i in chemComp ]
         
-        
-    # Temporary kinetic constant calculator
-    @staticmethod
-    def calK(spc1, spc2, L, t, c):
-        
-        parts1 = spc1.split("__")
-        l = (L-t) * c/float(len(parts1))
-        k = 5 * (10**4) * math.sqrt(l+t)
-        
-        return k
-    
-    
-    @staticmethod
-    def match(spc1, spc2):
-    
-        parts1 = spc1.split("__")
-        parts2 = spc2.split("__")
-        
-        c = 0
-        for i in range(len(parts1)) :
-            if parts1[i] == parts2[i] :
-                c += 1
-                
-        return c
-    
-    
-    @staticmethod
-    def QDisplayTubes(tubes, maxNum):
-    
-        app = QApplication(sys.argv)
-        
-        w = QWidget()
-        
-        l = QVBoxLayout().addWidget(w)
-        
-        d = QDialog()
-        d.resize(500, 500)
-        d.setLayout(l)
-        
-        sys.exit(app.exec_())
-        app.exec_()
         
     
+#     @staticmethod
+#     def QDisplayTubes(tubes, maxNum):
+#     
+#         app = QApplication(sys.argv)
+#         
+#         w = QWidget()
+#         
+#         l = QVBoxLayout().addWidget(w)
+#         
+#         d = QDialog()
+#         d.resize(500, 500)
+#         d.setLayout(l)
+#         
+#         sys.exit(app.exec_())
+#         app.exec_()
+        
+
+    #FIXME: don't stop when this method is called 
     @staticmethod
     def plotReactionProcess(X):
         
@@ -245,18 +237,17 @@ class Tools(object):
         
         for i in range(n) :
             plt.plot(X[:, n], X[:, i])
-#         plt.show()
-        plt.draw()
+        plt.show()
         
 
 if __name__ == '__main__' :
-#     k = Tools.kB * Tools.T /Tools.h * math.exp(-(7.89 + 0.009*Tools.dG)/(Tools.R*Tools.T))
+#     k = Tools_GPU.kB * Tools_GPU.T /Tools_GPU.h * math.exp(-(7.89 + 0.009*Tools_GPU.dG)/(Tools_GPU.R*Tools_GPU.T))
 #     print k
-#     kp = Tools.calK("1__2__3", "1__2__3", 8, 8)
+#     kp = Tools_GPU.calK("1__2__3", "1__2__3", 8, 8)
 #     print kp
     
-    tube = DNATube()
+    tube = DNATube_GPU()
     if isinstance(tube, Tube) :
         print("Tube")
-    elif isinstance(tube, DNATube) :
+    elif isinstance(tube, DNATube_GPU) :
         print("Tube")

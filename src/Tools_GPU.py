@@ -73,7 +73,7 @@ class Tools_GPU(Tools):
         if isinstance(tube, DNATube_GPU) :
             return Tools_GPU.__findReactionMatrixOnDNATube(tube, reverse)
                 
-    
+
     @staticmethod
     def __findReactionMatrixOnDNATube(tube, reverse):
         
@@ -128,8 +128,8 @@ class Tools_GPU(Tools):
                     tube.RList.append(spcDS)
                     r = [ tube.idxTop[spcTop], tube.idxBot[spcBot], k, tube.idxDS[spcDS] ]
                     R = np.vstack((R,r))
-                else :
-                    print("A")
+#                 else :
+#                     print("A")
         tube.newTop[:] = [] #empty new component list
                 
         for spcBot in tube.newBot :
@@ -143,8 +143,8 @@ class Tools_GPU(Tools):
                     tube.RList.append(spcDS)
                     r = [ tube.idxTop[spcTop], tube.idxBot[spcBot], k, tube.idxDS[spcDS] ]
                     R = np.vstack((R,r))
-                else :
-                    print("B")
+#                 else :
+#                     print("B")
         tube.newBot[:] = []
         
         #FIXME: fit to new data structure
@@ -231,12 +231,12 @@ class Tools_GPU(Tools):
 
     #FIXME: don't stop when this method is called 
     @staticmethod
-    def plotReactionProcess(X):
+    def plotReactionProcess(X, X0):
         
-        n = np.size(X, axis=1)-1
+        n = np.size(X, axis=1)
         
         for i in range(n) :
-            plt.plot(X[:, n], X[:, i])
+            plt.plot(X0, X[:, i])
         plt.show()
         
 

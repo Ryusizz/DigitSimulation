@@ -1,4 +1,5 @@
 import theano
+import theano.tensor as T
 import time
 from timeit import default_timer as timer
 
@@ -106,4 +107,47 @@ def test_theanoGPU():
                                                np_end-np_start, t_end-t_start)
     print "Result difference: %f" % (np.abs(AB-tAB).max(), )
     
-test_theanoGPU()
+    
+def test_theanoMethod():
+    
+    A = T.dvector('A')
+    B = T.dvector('B')
+    C = A * B
+    f = theano.function([A,B], C)
+    print f(np.ones(5), np.array(range(5)))
+    
+
+def test_theanoElementwiseMult():
+    
+    N = 5000000
+    A = np.asarray(np.random.rand(N), dtype=theano.config.floatX)
+    B = np.asarray(np.random.rand(N), dtype=theano.config.floatX)
+    np_start = time.time()
+    for i in range(1000) :
+        AB = np.multiply(A,B)
+    np_end = time.time()
+    X = theano.shared(A, borrow=True)
+    Y = theano.shared(B, borrow=True)
+    for i in range(1000) :
+        mf = theano.function([], X*Y)
+    t_start = time.time()
+    tAB = mf()
+    t_end = time.time()
+    print "NP time: %f[s], theano time: %f[s] (times should be close when run on CPU!)" %(
+                                               np_end-np_start, t_end-t_start)
+    print "Result difference: %f" % (np.abs(AB-tAB).max(), )
+    
+    
+def addOneElementTheano():
+    
+    Cs = theano.shared(np.asarray(np.ones((5,5))))
+    row = T.iscalar("row")
+    col = T.iscalar("col")
+    
+    update = [(Cs[row][col], Cs[row][col]+1)]
+    addConc = theano.function([row, col], updates=update)
+    addConc(2,3)
+    print Cs.get_value()
+
+addOneElementTheano()
+print theano.config.floatX

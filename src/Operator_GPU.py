@@ -10,12 +10,9 @@ from collections import Counter
 import random
 from timeit import default_timer as timer
 
-from numba import cuda
-
-from DNATube import DNATube
 from DNATube_GPU import DNATube_GPU
 from DataModule import DataModule
-from SSAModule import SSAModule
+from SSAModule_GPU import SSA
 from Tools_GPU import Tools_GPU
 from Tube import Tube
 import numpy as np
@@ -55,11 +52,10 @@ class Operator_GPU(object):
         
 #         print("\t\t\t\tStart SSA")
         if tube.R.shape[0] > 0 :
-            ssam = SSAModule()
+            
             dm = DataModule()
-
-            if isinstance(tube, DNATube) :
-                molCountsList, spcsList, headList, timeCounts, rTimeEnd = ssam.SSA(tube, time)
+            if isinstance(tube, DNATube_GPU) :
+                molCountsList, spcsList, headList, timeCounts, rTimeEnd = SSA(tube, time)
                 if isRecordReact :
                     for i in range(len(molCountsList)) :
                         molCounts = molCountsList[i]
@@ -69,10 +65,13 @@ class Operator_GPU(object):
                     dm.saveMolCounts(timeCounts, ["time"], "time", tag, tube.lbl)
                 
             elif isinstance(tube, Tube) :    
-                molCounts, items, rTimeEnd = ssam.SSA(tube, time)
+                molCounts, items, rTimeEnd = SSA(tube, time)
                 if isRecordReact :
                     dm.saveMolCounts(molCounts, items, "All", tag, tube.lbl)
-#             Tools_GPU.plotReactionProcess(molCounts)
+            
+#             Tools_GPU.plotReactionProcess(molCountsList[0], timeCounts)
+#             Tools_GPU.plotReactionProcess(molCountsList[1], timeCounts)
+#             Tools_GPU.plotReactionProcess(molCountsList[2], timeCounts)
             
             return rTimeEnd
         
@@ -116,10 +115,13 @@ class Operator_GPU(object):
     def separation(tube, y):
         
         sp = Counter()
-        
-        if isinstance(tube, DNATube) :
-            for spc, mol in tube.chemCompDS.items() :
-                sp[spc] = mol * y
+        if isinstance(tube, DNATube_GPU) :
+            for spc, idx in tube.idxDS.items() :
+                try :
+                    sp[spc] = tube.chemCompDS[idx] * y
+                except :
+                    pass
+#                     print len(tube.chemCompDS), idx
         
         elif isinstance(tube, Tube) :
             for spc in tube.chemComp.keys() :
@@ -135,7 +137,7 @@ class Operator_GPU(object):
     @staticmethod
     def denaturationOnDNATube(D, pos, vol):
         
-        tubeOut = DNATube()
+        tubeOut = DNATube_GPU()
         
         for spc in D.keys() :
             [top, bot] = spc.split("___")
@@ -175,8 +177,8 @@ class Operator_GPU(object):
     def amplification(tube, time):
         
         for chemComp in tube.chemCompList :
-            for spcs in chemComp :
-                chemComp[spcs] *= time
+            for i in range(len(chemComp)) :
+                chemComp[i] *= time
     
     
     @staticmethod

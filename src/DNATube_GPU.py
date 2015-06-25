@@ -150,6 +150,31 @@ class DNATube_GPU(DNATube):
         out.vol += vol
         
         return out
+    
+    
+    def copyTube(self, vol):
+        
+        out = DNATube_GPU()
+        ratio = vol/float(self.vol)
+        
+        out.chemCompTop[:] = [ i*ratio for i in self.chemCompTop ]
+        out.chemCompBot[:] = [ i*ratio for i in self.chemCompBot ]
+        out.chemCompDS[:] = [ i*ratio for i in self.chemCompBot ]
+        out.spcsNum = self.spcsNum
+        
+        out.idxTop = self.idxTop.copy()
+        out.idxBot = self.idxBot.copy()
+        out.idxDS = self.idxDS.copy()
+        out.idxList = [out.idxTop, out.idxBot, out.idxDS]
+        
+        out.newTop[:] = self.newTop[:]
+        out.newBot[:] = self.newBot[:]
+        out.newDS[:] = self.newDS[:]
+        
+        out.vol += vol
+        
+        return out
+    
             
     def adjustChemCompLen(self):
         
@@ -181,6 +206,10 @@ class DNATube_GPU(DNATube):
             return len(self.chemCompTop) + len(self.chemCompBot) + len(self.chemCompDS)
         else :
             print("Error : Wrong Chemical Component Position")
+            
+    def getTotalChemComp(self):
+        
+        return (np.array(self.chemCompTop) + np.array(self.chemCompBot) + np.array(self.chemCompDS)).tolist()
     
     def plotDistribution(self, pos, binsize):
         

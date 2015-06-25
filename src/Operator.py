@@ -10,7 +10,7 @@ from collections import Counter
 import random
 from timeit import default_timer as timer
 
-from numba import cuda
+# from numba import cuda
 
 from DNATube import DNATube
 from DataModule import DataModule
